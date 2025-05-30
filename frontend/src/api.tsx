@@ -1,26 +1,26 @@
 import { YouTubeApiResponse } from "./youtubeApi";
 import axios from "axios";
 
-export const fetchYoutubeVideos = async () => {
-  try {
-    const response = await axios.get<YouTubeApiResponse>(
-      "https://www.googleapis.com/youtube/v3/search",
-      {
-        params: {
-          key: "AIzaSyBvWZh5f2wzYyUCHD5UJ1_5NkvwHdVEMQE",
-          channelId: "UC8YW6FO4bJzh8IKJl3PtZqw",
-          part: "snippet,id",
-          order: "date",
-          maxResults: 10,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching YouTube videos:", error);
-    throw error;
-  }
-};
+// export const fetchYoutubeVideos = async () => {
+//   try {
+//     const response = await axios.get<YouTubeApiResponse>(
+//       "https://www.googleapis.com/youtube/v3/search",
+//       {
+//         params: {
+//           key: "AIzaSyBvWZh5f2wzYyUCHD5UJ1_5NkvwHdVEMQE",
+//           channelId: "UC8YW6FO4bJzh8IKJl3PtZqw",
+//           part: "snippet,id",
+//           order: "date",
+//           maxResults: 10,
+//         },
+//       }
+//     );
+//     return response.data;
+//   } catch (error) {
+//     console.error("Error fetching YouTube videos:", error);
+//     throw error;
+//   }
+// };
 
 export const subscribeToChannel = async (channelId: string) => {
   const token = localStorage.getItem("youtubeToken");
@@ -427,5 +427,265 @@ export const deleteVideoPlaylist = async (id: string): Promise<void> => {
     } else {
       throw new Error("Network error or invalid request");
     }
+  }
+};
+
+const handleApiError = (error: any) => {
+  if (error.response) {
+    if (error.response.status === 401) {
+      localStorage.removeItem("youtubeToken");
+      window.location.href = "/signin";
+    }
+    throw new Error(
+      `API error: ${error.response.status} - ${error.response.data.error.message}`
+    );
+  } else {
+    throw new Error("Network error or invalid request");
+  }
+};
+
+// Hàm đã có từ trước (giữ nguyên)
+export const fetchYoutubeVideos = async (
+  channelId: string,
+  pageToken?: string
+) => {
+  try {
+    const response = await axios.get<YouTubeApiResponse>(
+      "https://www.googleapis.com/youtube/v3/search",
+      {
+        params: {
+          key: import.meta.env.VITE_YOUTUBE_API_KEY,
+          channelId,
+          part: "snippet,id",
+          order: "date",
+          maxResults: 10,
+          pageToken,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+// Lấy thông tin chi tiết video theo ID (list với bộ lọc)
+export const getVideoDetails = async (videoIds: string[]) => {
+  const token = localStorage.getItem("youtubeToken");
+  try {
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/videos",
+      {
+        params: {
+          key: import.meta.env.VITE_YOUTUBE_API_KEY,
+          id: videoIds.join(","),
+          part: "snippet,statistics",
+        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }
+    );
+    return response.data.items;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+// Tải video mới (insert)
+export const uploadVideo = async (
+  title: string,
+  description: string,
+  tags: string[],
+  videoFile: File
+) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const metadata = {
+    snippet: {
+      title,
+      description,
+      tags,
+    },
+    status: {
+      privacyStatus: "public", // Có thể đổi thành "private" hoặc "unlisted"
+    },
+  };
+
+  const formData = new FormData();
+  formData.append("metadata", JSON.stringify(metadata));
+  formData.append("video", videoFile);
+
+  try {
+    const response = await axios.post(
+      "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status",
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+// Cập nhật video (update)
+export const updateVideo = async (
+  videoId: string,
+  title: string,
+  description: string,
+  tags: string[]
+) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const data = {
+    id: videoId,
+    snippet: {
+      title,
+      description,
+      tags,
+      categoryId: "22", // Giả định category "People & Blogs"
+    },
+  };
+
+  try {
+    const response = await axios.put(
+      "https://www.googleapis.com/youtube/v3/videos?part=snippet",
+      data,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+// Xóa video (delete)
+export const deleteVideo = async (videoId: string) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  try {
+    await axios.delete(
+      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+// Đánh giá video (rate)
+export const rateVideo = async (
+  videoId: string,
+  rating: "like" | "dislike" | "none"
+) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  try {
+    await axios.post(
+      `https://www.googleapis.com/youtube/v3/videos/rate?id=${videoId}&rating=${rating}`,
+      null,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+// Lấy đánh giá video (getRating)
+export const getVideoRating = async (videoId: string) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  try {
+    const response = await axios.get(
+      `https://www.googleapis.com/youtube/v3/videos/getRating?id=${videoId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data.items[0].rating;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+// Báo cáo vi phạm (reportAbuse)
+export const reportVideoAbuse = async (videoId: string, reason: string) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const data = {
+    videoId,
+    reasonId: reason, // Ví dụ: "spam", "violence", "harmful"
+    comments: "Reported via API",
+  };
+
+  try {
+    await axios.post(
+      "https://www.googleapis.com/youtube/v3/videos/reportAbuse",
+      data,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+export const checkChannelOwnership = async (channelId: string) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) {
+    console.log("No token found");
+    return false;
+  }
+
+  try {
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/channels",
+      {
+        params: {
+          key: import.meta.env.VITE_YOUTUBE_API_KEY,
+          part: "snippet",
+          mine: true, // Dùng mine=true
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    console.log("Channel ownership response:", response.data);
+    return response.data.items.some((item: any) => item.id === channelId);
+  } catch (error: any) {
+    console.error(
+      "Error checking channel ownership:",
+      error.response?.data || error.message
+    );
+    return false;
   }
 };

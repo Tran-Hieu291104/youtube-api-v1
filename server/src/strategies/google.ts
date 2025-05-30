@@ -24,7 +24,7 @@ passport.use(
     async (accessToken: string, refreshToken: string, profile, done: VerifyCallback) => {
       console.log('Access Token:', accessToken);
       console.log('Profile:', profile);
-      done(null, { username: profile.displayName, accessToken });
+      done(null, { accessToken, profile });
     }
   )
 );
