@@ -6,13 +6,16 @@ import "flatpickr/dist/flatpickr.css";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AppWrapper } from "./components/common/PageMeta";
 import App from "./App";
+import { CommentProvider } from "./components/comments/CommentContext";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      <AppWrapper>
-        <App />
-      </AppWrapper>
-    </ThemeProvider>
+    <CommentProvider>
+      <ThemeProvider>
+        <AppWrapper>
+          <App />
+        </AppWrapper>
+      </ThemeProvider>
+    </CommentProvider>
   </StrictMode>
 );

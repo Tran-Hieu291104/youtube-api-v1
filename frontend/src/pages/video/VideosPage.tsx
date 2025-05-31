@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadcrumb";
 import ComponentCard from "../../components/common/ComponentCard";
@@ -14,16 +14,21 @@ import {
   uploadVideo,
 } from "../../api";
 import Label from "../../components/form/Label";
+import CommentList from "../../components/comments/CommentList";
 
 export default function VideosPage() {
   const [videos, setVideos] = useState<YouTubeApiResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
   const [hasChannel, setHasChannel] = useState(false);
   const [channelId, setChannelId] = useState("UC8YW6FO4bJzh8IKJl3PtZqw");
+  const [currentPageToken, setCurrentPageToken] = useState<string | undefined>(
+    undefined
+  );
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [uploadForm, setUploadForm] = useState({
     title: "",
     description: "",
@@ -38,56 +43,64 @@ export default function VideosPage() {
   });
   const [reportForm, setReportForm] = useState({ videoId: "", reason: "spam" });
 
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Kiểm tra quyền qua email
-        const userEmail = localStorage.getItem("userEmail");
-        const canManage =
-          userEmail === "tranminhhieu291104@gmail.com" &&
-          channelId === "UC8yajWjBFgHQk-dkmSdc5lQ";
-        setHasChannel(canManage);
-        console.log(
-          "hasChannel:",
-          canManage,
-          "channelId:",
-          channelId,
-          "email:",
-          userEmail
-        );
+  const fetchVideos = async (pageToken?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const userEmail = localStorage.getItem("userEmail") || "";
+      const canManage =
+        userEmail === "tranminhhieu291104@gmail.com" &&
+        channelId === "UC8yajWjBFgHQk-dkmSdc5lQ";
+      setHasChannel(canManage);
+      console.log(
+        "hasChannel:",
+        canManage,
+        "channelId:",
+        channelId,
+        "email:",
+        userEmail
+      );
 
-        // Lấy video
-        const data = await fetchYoutubeVideos(channelId);
-        setVideos(data);
-        setTotalPages(Math.ceil(data.pageInfo.totalResults / pageSize));
-      } catch (err) {
-        setError("Failed to fetch videos");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    init();
-  }, [pageSize, pageNumber, channelId]);
+      const data = await fetchYoutubeVideos(channelId, pageToken);
+      console.log("Fetched videos:", data);
+      setVideos(data);
+      setTotalPages(Math.ceil(data.pageInfo.totalResults / pageSize));
+      setCurrentPageToken(pageToken);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch videos");
+      console.error("Fetch videos error:", err.message, err.response?.data);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChannelIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setChannelId(e.target.value);
     setPageNumber(1);
+    setCurrentPageToken(undefined);
+    setVideos(null);
+    setSelectedVideoId(null);
   };
 
   const handlePrevPage = () => {
-    if (pageNumber > 1) setPageNumber((prev) => prev - 1);
+    if (pageNumber > 1) {
+      setPageNumber((prev) => prev - 1);
+      fetchVideos(videos?.prevPageToken);
+    }
   };
 
   const handleNextPage = () => {
-    if (pageNumber < totalPages) setPageNumber((prev) => prev + 1);
+    if (pageNumber < totalPages) {
+      setPageNumber((prev) => prev + 1);
+      fetchVideos(videos?.nextPageToken);
+    }
   };
 
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setPageSize(Number(e.target.value));
     setPageNumber(1);
+    setCurrentPageToken(undefined);
+    fetchVideos();
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
@@ -98,6 +111,12 @@ export default function VideosPage() {
     }
     setLoading(true);
     try {
+      console.log("Uploading video with:", {
+        title: uploadForm.title,
+        description: uploadForm.description,
+        tags: uploadForm.tags,
+        file: uploadForm.file.name,
+      });
       await uploadVideo(
         uploadForm.title,
         uploadForm.description,
@@ -110,7 +129,7 @@ export default function VideosPage() {
       setError(null);
     } catch (err) {
       setError("Failed to upload video");
-      console.error(err);
+      console.error("Upload error:", err);
     } finally {
       setLoading(false);
     }
@@ -146,6 +165,7 @@ export default function VideosPage() {
       const data = await fetchYoutubeVideos(channelId);
       setVideos(data);
       setError(null);
+      if (selectedVideoId === videoId) setSelectedVideoId(null);
     } catch (err) {
       setError("Failed to delete video");
       console.error(err);
@@ -210,6 +230,13 @@ export default function VideosPage() {
                 className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
               />
             </div>
+            <Button
+              type="button"
+              onClick={() => fetchVideos()}
+              className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
+            >
+              Load Videos
+            </Button>
           </div>
         </ComponentCard>
 
@@ -310,12 +337,18 @@ export default function VideosPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {videos.items.map((video) => (
                   <div key={video.id.videoId || video.id} className="relative">
-                    <VideoCard
-                      videoId={video.id.videoId || video.id}
-                      title={video.snippet.title}
-                      description={video.snippet.description}
-                      thumbnailUrl={video.snippet.thumbnails.medium.url}
-                    />
+                    <div
+                      onClick={() =>
+                        setSelectedVideoId(video.id.videoId || video.id)
+                      }
+                    >
+                      <VideoCard
+                        videoId={video.id.videoId || video.id}
+                        title={video.snippet.title}
+                        description={video.snippet.description}
+                        thumbnailUrl={video.snippet.thumbnails.medium.url}
+                      />
+                    </div>
                     <div className="absolute top-2 right-2 flex gap-2 z-10">
                       {hasChannel && (
                         <>
@@ -389,9 +422,16 @@ export default function VideosPage() {
                   Next
                 </Button>
               </div>
+              {selectedVideoId && (
+                <ComponentCard title="Video Comments">
+                  <CommentList videoId={selectedVideoId} />
+                </ComponentCard>
+              )}
             </>
           ) : (
-            <div className="text-center py-10">No videos available.</div>
+            <div className="text-center py-10">
+              No videos available. Click "Load Videos" to fetch.
+            </div>
           )}
         </ComponentCard>
 

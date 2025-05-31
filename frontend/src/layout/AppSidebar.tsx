@@ -35,7 +35,7 @@ const navItems: NavItem[] = [
     name: "Youtube Data API",
     subItems: [
       { name: "Videos", path: "/videos", pro: false },
-      { name: "Add Book", path: "/add-book", pro: false },
+      { name: "Play Lists", path: "/playlists", pro: false },
       { name: "Add Audio Book", path: "/add-audio-book", pro: false },
     ],
   },
