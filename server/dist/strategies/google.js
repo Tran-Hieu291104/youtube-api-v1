@@ -20,6 +20,6 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
 }, async (accessToken, refreshToken, profile, done) => {
     console.log('Access Token:', accessToken);
     console.log('Profile:', profile);
-    done(null, { username: profile.displayName, accessToken });
+    done(null, { accessToken, profile });
 }));
 exports.default = passport_1.default;

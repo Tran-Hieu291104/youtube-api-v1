@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Checkbox from "../form/input/Checkbox";
 import Label from "../form/Label";
@@ -12,34 +12,32 @@ export default function SignInForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Kiểm tra token và xử lý query
   useEffect(() => {
-    // Lấy token từ query parameter
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(location.search);
     const token = urlParams.get("token");
-    if (token) {
-      console.log("Received token:", token);
+    const userEmail = urlParams.get("email");
+    if (token && userEmail) {
+      console.log("Received token:", token, "email:", userEmail);
       localStorage.setItem("youtubeToken", token);
-      // Xóa query parameter khỏi URL
-      window.history.replaceState({}, document.title, "/signin");
-      navigate("/"); // Chuyển hướng về Home
-      return;
+      localStorage.setItem("userEmail", userEmail);
+      window.history.replaceState({}, document.title, "/");
+      navigate("/", { replace: true });
     }
-
-    // Kiểm tra token trong localStorage
-    const storedToken = localStorage.getItem("youtubeToken");
-    if (storedToken) {
-      navigate("/"); // Chuyển hướng nếu đã có token
-    }
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    // Logic đăng nhập email/password (nếu cần)
-    setLoading(false);
+    try {
+      setError("Email/password login not implemented");
+    } catch {
+      setError("Failed to sign in");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleSignIn = () => {
@@ -63,6 +61,7 @@ export default function SignInForm() {
           </div>
           <div>
             {error && <div className="text-red-600 mb-4">{error}</div>}
+            {loading && <div className="text-center mb-4">Loading...</div>}
             <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>

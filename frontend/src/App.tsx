@@ -5,7 +5,8 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import SignIn from "./pages/authPages/SignIn";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import Home from "./pages/dashBoard/Home";
-import Video from "./components/test/videos/Videos";
+import VideosPage from "./pages/video/VideosPage";
+import PlaylistsPage from "./pages/playListsPage/PlaylistsPage";
 
 export default function App() {
   return (
@@ -16,7 +17,9 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index path="/" element={<Home />} />
 
-            <Route path="/videos" element={<Video />} />
+            <Route path="/videos" element={<VideosPage />} />
+
+            <Route path="/playlists" element={<PlaylistsPage />} />
 
             {/* <Route path="/add-book" element={<AddBook />} />
             <Route path="/add-audio-book" element={<AddAudioBook />} />
