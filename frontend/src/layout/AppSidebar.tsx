@@ -36,7 +36,8 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Videos", path: "/videos", pro: false },
       { name: "Play Lists", path: "/playlists", pro: false },
-      { name: "Add Audio Book", path: "/add-audio-book", pro: false },
+      { name: "Channels", path: "/channels", pro: false },
+      { name: "Subscriptions", path: "/subscriptions", pro: false },
     ],
   },
   {

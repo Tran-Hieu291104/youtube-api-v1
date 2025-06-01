@@ -1,27 +1,6 @@
 import { YouTubeApiResponse } from "./youtubeApi";
 import axios from "axios";
 
-// export const fetchYoutubeVideos = async () => {
-//   try {
-//     const response = await axios.get<YouTubeApiResponse>(
-//       "https://www.googleapis.com/youtube/v3/search",
-//       {
-//         params: {
-//           key: "AIzaSyBvWZh5f2wzYyUCHD5UJ1_5NkvwHdVEMQE",
-//           channelId: "UC8YW6FO4bJzh8IKJl3PtZqw",
-//           part: "snippet,id",
-//           order: "date",
-//           maxResults: 10,
-//         },
-//       }
-//     );
-//     return response.data;
-//   } catch (error) {
-//     console.error("Error fetching YouTube videos:", error);
-//     throw error;
-//   }
-// };
-
 export const subscribeToChannel = async (channelId: string) => {
   const token = localStorage.getItem("youtubeToken");
   if (!token) throw new Error("No access token found");
@@ -902,5 +881,231 @@ export const checkChannelOwnership = async (channelId: string) => {
       error.response?.data || error.message
     );
     return false;
+  }
+};
+
+// Channels API
+export const fetchChannelDetails = async () => {
+  const token = checkToken();
+  try {
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/channels",
+      {
+        params: {
+          part: "snippet,brandingSettings,statistics",
+          mine: true,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const fetchChannelDetailsById = async (channelId: string) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/channels",
+      {
+        params: {
+          part: "snippet,brandingSettings,statistics",
+          id: channelId,
+          key: API_KEY,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const updateChannel = async (channelData: {
+  id: string;
+  snippet?: { title: string };
+  brandingSettings?: { channel: { description?: string; keywords: string } };
+}) => {
+  const token = checkToken();
+
+  // Kiểm tra dữ liệu trước khi gửi
+  if (!channelData.id) {
+    throw new Error("Channel ID is required.");
+  }
+
+  try {
+    // Cập nhật snippet (title)
+    if (channelData.snippet) {
+      const { title } = channelData.snippet;
+      if (!title || title.length > 100) {
+        throw new Error(
+          "Title is required and must be less than 100 characters."
+        );
+      }
+      const snippetData = {
+        id: channelData.id,
+        snippet: {
+          title: title.trim(),
+        },
+      };
+      console.log("Updating snippet with data:", snippetData);
+      await axios.put(
+        "https://www.googleapis.com/youtube/v3/channels?part=snippet",
+        snippetData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    // Cập nhật brandingSettings (description, keywords)
+    if (channelData.brandingSettings) {
+      const { description, keywords } = channelData.brandingSettings.channel;
+      if (description && description.length > 1000) {
+        throw new Error("Description must be less than 1000 characters.");
+      }
+      if (keywords && keywords.length > 500) {
+        throw new Error("Keywords must be less than 500 characters.");
+      }
+      const brandingData = {
+        id: channelData.id,
+        brandingSettings: {
+          channel: {
+            description: description ? description.trim() : "",
+            keywords: keywords || "",
+          },
+        },
+      };
+      console.log("Updating brandingSettings with data:", brandingData);
+      await axios.put(
+        "https://www.googleapis.com/youtube/v3/channels?part=brandingSettings",
+        brandingData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// ChannelBanners API
+export const insertChannelBanner = async (file: File) => {
+  const validTypes = ["image/jpeg", "image/png", "image/bmp", "image/gif"];
+  if (!validTypes.includes(file.type)) {
+    throw new Error(
+      "Invalid file type. Only JPG, PNG, BMP, or GIF (non-animated) are supported."
+    );
+  }
+
+  const maxSize = 6 * 1024 * 1024; // 6MB
+  if (file.size > maxSize) {
+    throw new Error("File size exceeds 6MB limit.");
+  }
+
+  const token = checkToken();
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const uploadResponse = await axios.post(
+      "https://www.googleapis.com/upload/youtube/v3/channelBanners/insert",
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    console.log("Upload banner response:", uploadResponse.data);
+    if (!uploadResponse.data || !uploadResponse.data.url) {
+      throw new Error("Failed to get banner URL from upload response.");
+    }
+
+    // Không cần gọi channels.update vì channelBanners.insert đã tự động cập nhật banner
+    return uploadResponse.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Subscriptions API
+export const fetchSubscriptions = async (pageToken?: string) => {
+  const token = checkToken();
+  try {
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/subscriptions",
+      {
+        params: {
+          part: "snippet,contentDetails",
+          mine: true,
+          maxResults: 10,
+          pageToken,
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const insertSubscription = async (channelId: string) => {
+  const token = checkToken();
+  try {
+    const subscriptionData = {
+      snippet: {
+        resourceId: {
+          kind: "youtube#channel",
+          channelId: channelId,
+        },
+      },
+    };
+    const response = await axios.post(
+      "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet",
+      subscriptionData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const deleteSubscription = async (subscriptionId: string) => {
+  const token = checkToken();
+  try {
+    await axios.delete(
+      `https://www.googleapis.com/youtube/v3/subscriptions?id=${subscriptionId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  } catch (error) {
+    throw handleApiError(error);
   }
 };
