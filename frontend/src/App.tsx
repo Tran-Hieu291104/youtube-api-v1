@@ -9,6 +9,7 @@ import VideosPage from "./pages/video/VideosPage";
 import PlaylistsPage from "./pages/playListsPage/PlaylistsPage";
 import ChannelsPage from "./pages/channelsPage/ChannelsPage";
 import SubscriptionsPage from "./pages/subscriptions/SubscriptionsPage";
+import VideoListPage from "./pages/video-list/VideoListPage";
 
 export default function App() {
   return (
@@ -26,6 +27,8 @@ export default function App() {
             <Route path="/channels" element={<ChannelsPage />} />
 
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
+
+            <Route path="/video-list" element={<VideoListPage />} />
 
             {/* <Route path="/add-book" element={<AddBook />} />
             <Route path="/add-audio-book" element={<AddAudioBook />} />

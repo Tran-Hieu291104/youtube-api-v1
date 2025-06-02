@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Link } from "react-router-dom";
+import logoYouTube from "../../images/logo_youtube.png"; // Adjust the path as necessary
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,7 +22,7 @@ export default function UserDropdown() {
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-          <img src="/images/logo/logo_fonos.jpg" alt="fonos" />
+          <img src={logoYouTube} alt="fonos" />
         </span>
 
         <span className="block mr-1 font-medium text-theme-sm">Fonos</span>

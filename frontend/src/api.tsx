@@ -1109,3 +1109,252 @@ export const deleteSubscription = async (subscriptionId: string) => {
     throw handleApiError(error);
   }
 };
+
+export const fetchRecentVideos = async (
+  channelId: string,
+  maxResults: number
+) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+    const searchResponse = await axios.get(
+      "https://www.googleapis.com/youtube/v3/search",
+      {
+        params: {
+          key: API_KEY,
+          channelId: channelId,
+          part: "id,snippet",
+          order: "date",
+          maxResults: maxResults,
+          type: "video",
+        },
+      }
+    );
+
+    const videos = [];
+    for (const item of searchResponse.data.items) {
+      const videoId = item.id.videoId;
+      const videoResponse = await axios.get(
+        "https://www.googleapis.com/youtube/v3/videos",
+        {
+          params: {
+            key: API_KEY,
+            id: videoId,
+            part: "statistics",
+          },
+        }
+      );
+
+      const videoDetails = videoResponse.data.items[0];
+      videos.push({
+        title: item.snippet.title,
+        videoId: videoId,
+        publishedAt: new Date(item.snippet.publishedAt).toLocaleString(),
+        views: videoDetails.statistics.viewCount || 0,
+        thumbnailUrl: item.snippet.thumbnails.default.url,
+      });
+    }
+    return videos;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Google Sheets API
+export const fetchSheetVideos = async () => {
+  try {
+    const API_KEY = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY;
+    const SHEET_ID = import.meta.env.VITE_SHEET_ID;
+    const RANGE = "Sheet1!A2:E"; // Lấy dữ liệu từ A2 trở đi (bỏ tiêu đề)
+
+    const response = await axios.get(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}`,
+      {
+        params: {
+          key: API_KEY,
+        },
+      }
+    );
+
+    const rows = response.data.values || [];
+    const videos = rows.map((row: string[]) => ({
+      title: row[0] || "",
+      videoId: row[1] || "",
+      publishedAt: row[2] || "",
+      views: Number(row[3]) || 0,
+      thumbnailUrl: row[4] || "",
+    }));
+    return videos;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const fetchChannelStats = async (channelId: string) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/channels",
+      {
+        params: {
+          key: API_KEY,
+          id: channelId,
+          part: "statistics",
+        },
+      }
+    );
+
+    console.log("YouTube API response:", response.data); // Thêm log để kiểm tra
+    const stats = response.data.items[0]?.statistics || {};
+    return {
+      subscriberCount: Number(stats.subscriberCount) || 0,
+      viewCount: Number(stats.viewCount) || 0,
+      videoCount: Number(stats.videoCount) || 0,
+    };
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Monthly Views API
+export const fetchMonthlyViews = async (
+  channelId: string,
+  year: number,
+  maxResults: number = 50
+) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+    const searchResponse = await axios.get(
+      "https://www.googleapis.com/youtube/v3/search",
+      {
+        params: {
+          key: API_KEY,
+          channelId: channelId,
+          part: "id,snippet",
+          order: "date",
+          maxResults: maxResults,
+          type: "video",
+        },
+      }
+    );
+
+    const videos = [];
+    for (const item of searchResponse.data.items) {
+      const videoId = item.id.videoId;
+      const videoResponse = await axios.get(
+        "https://www.googleapis.com/youtube/v3/videos",
+        {
+          params: {
+            key: API_KEY,
+            id: videoId,
+            part: "statistics",
+          },
+        }
+      );
+
+      const videoDetails = videoResponse.data.items[0];
+      videos.push({
+        publishedAt: new Date(item.snippet.publishedAt),
+        views: Number(videoDetails.statistics.viewCount) || 0,
+      });
+    }
+
+    // Tính tổng lượt xem theo tháng, chỉ lấy video trong năm được chỉ định
+    const monthlyViews = Array(12).fill(0); // 12 tháng
+    videos.forEach((video) => {
+      if (video.publishedAt.getFullYear() === year) {
+        const month = video.publishedAt.getMonth(); // 0-11 (Jan-Dec)
+        monthlyViews[month] += video.views;
+      }
+    });
+
+    return monthlyViews;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const fetchMonthlyStats = async (
+  channelId: string,
+  year: number,
+  maxResults: number = 50
+) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+
+    // Lấy số liệu kênh (bao gồm tổng số người đăng ký hiện tại)
+    const channelResponse = await axios.get(
+      "https://www.googleapis.com/youtube/v3/channels",
+      {
+        params: {
+          key: API_KEY,
+          id: channelId,
+          part: "statistics",
+        },
+      }
+    );
+
+    const stats = channelResponse.data.items[0]?.statistics || {};
+    const totalSubscribers = Number(stats.subscriberCount) || 0;
+
+    // Lấy danh sách video gần đây
+    const searchResponse = await axios.get(
+      "https://www.googleapis.com/youtube/v3/search",
+      {
+        params: {
+          key: API_KEY,
+          channelId: channelId,
+          part: "id,snippet",
+          order: "date",
+          maxResults: maxResults,
+          type: "video",
+        },
+      }
+    );
+
+    const videos = [];
+    for (const item of searchResponse.data.items) {
+      const videoId = item.id.videoId;
+      const videoResponse = await axios.get(
+        "https://www.googleapis.com/youtube/v3/videos",
+        {
+          params: {
+            key: API_KEY,
+            id: videoId,
+            part: "statistics",
+          },
+        }
+      );
+
+      const videoDetails = videoResponse.data.items[0];
+      videos.push({
+        publishedAt: new Date(item.snippet.publishedAt),
+        views: Number(videoDetails.statistics.viewCount) || 0,
+      });
+    }
+
+    // Tính tổng lượt xem theo tháng trong năm được chọn
+    const monthlyViews = Array(12).fill(0);
+    videos.forEach((video) => {
+      if (video.publishedAt.getFullYear() === year) {
+        const month = video.publishedAt.getMonth(); // 0-11 (Jan-Dec)
+        monthlyViews[month] += video.views;
+      }
+    });
+
+    // Giả lập số người đăng ký tăng dần (phân bổ tổng số người đăng ký theo thời gian)
+    // Giả định: Số người đăng ký tăng đều từ đầu năm đến hiện tại (tháng 6/2025)
+    const monthlySubscribers = Array(12).fill(0);
+    const currentMonth = 5; // Tháng 6 (0-11)
+    const subscribersPerMonth = totalSubscribers / (currentMonth + 1); // Chia đều đến tháng hiện tại
+    for (let i = 0; i <= currentMonth; i++) {
+      monthlySubscribers[i] = Math.round(subscribersPerMonth * (i + 1));
+    }
+
+    return {
+      monthlyViews,
+      monthlySubscribers,
+    };
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};

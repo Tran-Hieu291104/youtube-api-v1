@@ -183,3 +183,13 @@ export interface PlaylistItem {
     };
   };
 }
+
+interface VideoListItemProps {
+  video: {
+    title: string;
+    videoId: string;
+    publishedAt: string;
+    views: number;
+    thumbnailUrl: string;
+  };
+}

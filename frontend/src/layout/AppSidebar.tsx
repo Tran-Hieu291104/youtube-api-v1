@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import logoYouTube from "../images/logo_youtube.png"; // Adjust the path as necessary
 
 // Assume these icons are imported from an icon library
 import {
@@ -38,6 +39,7 @@ const navItems: NavItem[] = [
       { name: "Play Lists", path: "/playlists", pro: false },
       { name: "Channels", path: "/channels", pro: false },
       { name: "Subscriptions", path: "/subscriptions", pro: false },
+      { name: "Video-List", path: "/video-list", pro: false },
     ],
   },
   {
@@ -268,7 +270,7 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-4 flex ${
+        className={` flex ${
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
@@ -277,14 +279,14 @@ const AppSidebar: React.FC = () => {
             <>
               <img
                 className="dark:hidden"
-                src="/images/logo/fonos-logo-name.png"
+                src={logoYouTube}
                 alt="Logo"
                 width={150}
                 height={40}
               />
               <img
                 className="hidden dark:block"
-                src="/images/logo/fonos-logo-name.png"
+                src={logoYouTube}
                 alt="Logo"
                 width={150}
                 height={40}
@@ -292,7 +294,7 @@ const AppSidebar: React.FC = () => {
             </>
           ) : (
             <img
-              src="/images/logo/logo-icon.svg"
+              src="/frontend/src/images/logo_youtube.png"
               alt="Logo"
               width={32}
               height={32}
