@@ -1,34 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadcrumb";
 import ComponentCard from "../../components/common/ComponentCard";
 import VideoCard from "../../components/videoCard/VideoCard";
 import Button from "../../components/ui/button/Button";
-import { YouTubeApiResponse } from "../../youtubeApi";
-import {
-  deleteVideo,
-  fetchYoutubeVideos,
-  rateVideo,
-  reportVideoAbuse,
-  updateVideo,
-  uploadVideo,
-} from "../../api";
 import Label from "../../components/form/Label";
-import CommentList from "../../components/comments/CommentList";
+import {
+  fetchYoutubeVideos,
+  fetchChannelActivities,
+  searchYouTube,
+  uploadVideo,
+  updateVideo,
+  reportVideoAbuse,
+} from "../../api";
+import { YouTubeApiResponse, YouTubeSearchResult } from "../../youtubeApi";
+
+// Explicitly define the type for video.id
+interface VideoItem {
+  id: { videoId?: string } | string;
+  snippet: {
+    title: string;
+    description: string;
+    thumbnails: {
+      medium: { url: string };
+    };
+  };
+}
 
 export default function VideosPage() {
   const [videos, setVideos] = useState<YouTubeApiResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(6);
-  const [totalPages, setTotalPages] = useState(1);
   const [hasChannel, setHasChannel] = useState(false);
   const [channelId, setChannelId] = useState("UC8YW6FO4bJzh8IKJl3PtZqw");
-  const [currentPageToken, setCurrentPageToken] = useState<string | undefined>(
-    undefined
-  );
-  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [uploadForm, setUploadForm] = useState({
     title: "",
     description: "",
@@ -42,6 +48,12 @@ export default function VideosPage() {
     tags: "",
   });
   const [reportForm, setReportForm] = useState({ videoId: "", reason: "spam" });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
+  const [channelActivities, setChannelActivities] = useState<any[]>([]);
+  const [searchParams] = useSearchParams();
+  const categoryId = searchParams.get("category");
+  const [showActivities, setShowActivities] = useState(false);
 
   const fetchVideos = async (pageToken?: string) => {
     setLoading(true);
@@ -52,20 +64,9 @@ export default function VideosPage() {
         userEmail === "tranminhhieu291104@gmail.com" &&
         channelId === "UC8yajWjBFgHQk-dkmSdc5lQ";
       setHasChannel(canManage);
-      console.log(
-        "hasChannel:",
-        canManage,
-        "channelId:",
-        channelId,
-        "email:",
-        userEmail
-      );
 
       const data = await fetchYoutubeVideos(channelId, pageToken);
-      console.log("Fetched videos:", data);
-      setVideos(data);
-      setTotalPages(Math.ceil(data.pageInfo.totalResults / pageSize));
-      setCurrentPageToken(pageToken);
+      setVideos(data ?? null); // Ensure null fallback for undefined data
     } catch (err: any) {
       setError(err.message || "Failed to fetch videos");
       console.error("Fetch videos error:", err.message, err.response?.data);
@@ -74,32 +75,54 @@ export default function VideosPage() {
     }
   };
 
+  const fetchChannelActivitiesData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const activities = await fetchChannelActivities(channelId);
+      setChannelActivities(activities);
+    } catch (err) {
+      setError("Failed to fetch channel activities");
+      console.error("Fetch channel activities error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (channelId) {
+      fetchVideos();
+      fetchChannelActivitiesData();
+    }
+  }, [channelId]);
+
+  useEffect(() => {
+    if (categoryId) {
+      const fetchVideosByCategory = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const results = await searchYouTube("", "video", undefined, undefined, categoryId);
+          setSearchResults(results);
+          setVideos(null); // Clear the video list to show category results
+        } catch (err) {
+          setError("Failed to fetch videos by category");
+          console.error("Category search error:", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchVideosByCategory();
+    }
+  }, [categoryId]);
+
   const handleChannelIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setChannelId(e.target.value);
-    setPageNumber(1);
-    setCurrentPageToken(undefined);
-    setVideos(null);
-    setSelectedVideoId(null);
-  };
-
-  const handlePrevPage = () => {
-    if (pageNumber > 1) {
-      setPageNumber((prev) => prev - 1);
-      fetchVideos(videos?.prevPageToken);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (pageNumber < totalPages) {
-      setPageNumber((prev) => prev + 1);
-      fetchVideos(videos?.nextPageToken);
-    }
+    setVideos(null); // Restored auto-load functionality
   };
 
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setPageSize(Number(e.target.value));
-    setPageNumber(1);
-    setCurrentPageToken(undefined);
     fetchVideos();
   };
 
@@ -157,39 +180,6 @@ export default function VideosPage() {
     }
   };
 
-  const handleDelete = async (videoId: string) => {
-    if (!confirm("Are you sure you want to delete this video?")) return;
-    setLoading(true);
-    try {
-      await deleteVideo(videoId);
-      const data = await fetchYoutubeVideos(channelId);
-      setVideos(data);
-      setError(null);
-      if (selectedVideoId === videoId) setSelectedVideoId(null);
-    } catch (err) {
-      setError("Failed to delete video");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRate = async (
-    videoId: string,
-    rating: "like" | "dislike" | "none"
-  ) => {
-    setLoading(true);
-    try {
-      await rateVideo(videoId, rating);
-      setError(null);
-    } catch (err) {
-      setError("Failed to rate video");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -200,6 +190,39 @@ export default function VideosPage() {
     } catch (err) {
       setError("Failed to report video");
       console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fixed the search functionality to load video list
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const results = await searchYouTube(searchQuery);
+      setSearchResults(results);
+      setVideos(null); // Clear the video list to show search results
+      setShowActivities(false); // Hide activities when searching
+    } catch (err) {
+      setError("Failed to search");
+      console.error("Search error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadChannelData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await fetchVideos();
+      await fetchChannelActivitiesData();
+      setShowActivities(true); // Show activities when loading channel data
+    } catch (err) {
+      setError("Failed to load channel data");
+      console.error("Load channel data error:", err);
     } finally {
       setLoading(false);
     }
@@ -217,27 +240,113 @@ export default function VideosPage() {
       />
       <PageBreadcrumb pageTitle="Videos" />
       <div className="space-y-6">
-        {/* Ô nhập Channel ID */}
-        <ComponentCard title="Select Channel">
-          <div className="space-y-4">
-            <div>
-              <Label>Channel ID</Label>
-              <input
-                type="text"
-                value={channelId}
-                onChange={handleChannelIdChange}
-                placeholder="Enter YouTube Channel ID"
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              />
+        {/* Split Section: Select Channel and Search */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Select Channel */}
+          <ComponentCard title="Select Channel">
+            <div className="space-y-4">
+              <div>
+                <Label>Channel ID</Label>
+                <input
+                  type="text"
+                  value={channelId}
+                  onChange={handleChannelIdChange}
+                  placeholder="Enter YouTube Channel ID"
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={handleLoadChannelData}
+                className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
+              >
+                Load Channel Data
+              </Button>
             </div>
-            <Button
-              type="button"
-              onClick={() => fetchVideos()}
-              className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
-            >
-              Load Videos
-            </Button>
-          </div>
+          </ComponentCard>
+
+          {/* Search YouTube */}
+          <ComponentCard title="Search YouTube">
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div>
+                <Label>Search Query</Label>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Enter keywords"
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50"
+              >
+                Search
+              </Button>
+            </form>
+          </ComponentCard>
+        </div>
+
+        {/* Video List */}
+        <ComponentCard
+          title={
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-semibold text-gray-800 dark:text-white/90">
+                Video List
+              </span>
+              <select
+                value={pageSize}
+                onChange={handlePageSizeChange}
+                className="h-8 w-32 rounded-lg border border-gray-300 bg-transparent px-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+              >
+                <option value="6">6 per page</option>
+                <option value="12">12 per page</option>
+                <option value="18">18 per page</option>
+              </select>
+            </div>
+          }
+        >
+          {videos && videos.items.length > 0 ? (
+            <>
+              <div className="mb-4 text-gray-600 dark:text-gray-300">
+                Total videos: {videos.pageInfo.totalResults} | Showing {pageSize} per page
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {videos.items.map((video: VideoItem) => (
+                  <VideoCard
+                    key={typeof video.id === "object" ? video.id.videoId || "unknown" : video.id}
+                    videoId={typeof video.id === "object" ? video.id.videoId || "unknown" : video.id}
+                    title={video.snippet.title}
+                    description={video.snippet.description}
+                    thumbnailUrl={video.snippet.thumbnails.medium.url}
+                  />
+                ))}
+              </div>
+            </>
+          ) : searchResults.length > 0 ? (
+            <>
+              <div className="mb-4 text-gray-600 dark:text-gray-300">
+                Search results: {searchResults.length}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {searchResults.map((result) => (
+                  <VideoCard
+                    key={result.id.videoId || result.id.channelId || result.id.playlistId || "unknown"}
+                    videoId={result.id.videoId || result.id.channelId || result.id.playlistId || "unknown"}
+                    title={result.snippet.title}
+                    description={result.snippet.description}
+                    thumbnailUrl={result.snippet.thumbnails.medium.url}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-10">
+              No videos available. Click "Load Videos" or perform a search.
+            </div>
+          )}
         </ComponentCard>
 
         {/* Form tải video mới */}
@@ -308,132 +417,6 @@ export default function VideosPage() {
             </form>
           </ComponentCard>
         )}
-
-        {/* Danh sách video */}
-        <ComponentCard
-          title={
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-semibold text-gray-800 dark:text-white/90">
-                Video List
-              </span>
-              <select
-                value={pageSize}
-                onChange={handlePageSizeChange}
-                className="h-8 w-32 rounded-lg border border-gray-300 bg-transparent px-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              >
-                <option value="6">6 per page</option>
-                <option value="12">12 per page</option>
-                <option value="18">18 per page</option>
-              </select>
-            </div>
-          }
-        >
-          {videos && videos.items.length > 0 ? (
-            <>
-              <div className="mb-4 text-gray-600 dark:text-gray-300">
-                Total videos: {videos.pageInfo.totalResults} | Showing{" "}
-                {pageSize} per page
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {videos.items.map((video) => (
-                  <div key={video.id.videoId || video.id} className="relative">
-                    <div
-                      onClick={() =>
-                        setSelectedVideoId(video.id.videoId || video.id)
-                      }
-                    >
-                      <VideoCard
-                        videoId={video.id.videoId || video.id}
-                        title={video.snippet.title}
-                        description={video.snippet.description}
-                        thumbnailUrl={video.snippet.thumbnails.medium.url}
-                      />
-                    </div>
-                    <div className="absolute top-2 right-2 flex gap-2 z-10">
-                      {hasChannel && (
-                        <>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() =>
-                              setEditForm({
-                                videoId: video.id.videoId || video.id,
-                                title: video.snippet.title,
-                                description: video.snippet.description,
-                                tags: video.snippet.tags?.join(", ") || "",
-                              })
-                            }
-                            className="bg-yellow-500 text-white hover:bg-yellow-600"
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() =>
-                              handleDelete(video.id.videoId || video.id)
-                            }
-                            className="bg-red-500 text-white hover:bg-red-600"
-                          >
-                            Delete
-                          </Button>
-                        </>
-                      )}
-                      <select
-                        onChange={(e) =>
-                          handleRate(
-                            video.id.videoId || video.id,
-                            e.target.value as "like" | "dislike" | "none"
-                          )
-                        }
-                        className="h-8 w-24 rounded-lg border border-gray-300 bg-white/90 dark:bg-gray-800/90 px-2 text-sm text-gray-700 dark:text-white/90 z-10 shadow-theme-xs"
-                      >
-                        <option value="" disabled selected>
-                          Rate
-                        </option>
-                        <option value="like">Like</option>
-                        <option value="dislike">Dislike</option>
-                        <option value="none">Remove Rating</option>
-                      </select>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between items-center mt-6">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handlePrevPage}
-                  disabled={pageNumber === 1}
-                  className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50"
-                >
-                  Previous
-                </Button>
-                <span className="text-gray-600 dark:text-gray-300">
-                  Page {pageNumber} of {totalPages}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleNextPage}
-                  disabled={pageNumber === totalPages}
-                  className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50"
-                >
-                  Next
-                </Button>
-              </div>
-              {selectedVideoId && (
-                <ComponentCard title="Video Comments">
-                  <CommentList videoId={selectedVideoId} />
-                </ComponentCard>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-10">
-              No videos available. Click "Load Videos" to fetch.
-            </div>
-          )}
-        </ComponentCard>
 
         {/* Form chỉnh sửa video */}
         {hasChannel && editForm.videoId && (
@@ -543,6 +526,26 @@ export default function VideosPage() {
               Report
             </Button>
           </form>
+        </ComponentCard>
+
+        {/* Channel Activities */}
+        <ComponentCard title="Channel Activities">
+          {showActivities && channelActivities.length > 0 ? (
+            <div className="space-y-4">
+              {channelActivities.map((activity, index) => (
+                <div key={index} className="p-4 border rounded-lg">
+                  <h4 className="text-lg font-semibold">
+                    {activity.snippet.title || "Untitled Activity"}
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    {activity.snippet.description || "No description available."}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10">No activities available.</div>
+          )}
         </ComponentCard>
       </div>
     </>

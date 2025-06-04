@@ -10,6 +10,8 @@ import PlaylistsPage from "./pages/playListsPage/PlaylistsPage";
 import ChannelsPage from "./pages/channelsPage/ChannelsPage";
 import SubscriptionsPage from "./pages/subscriptions/SubscriptionsPage";
 import VideoListPage from "./pages/video-list/VideoListPage";
+import LiveBroadcastsPage from "./pages/video/LiveBroadcastsPage";
+import I18nLanguagesAndRegionsPage from "./components/common/I18nLanguagesDropdown";
 
 export default function App() {
   return (
@@ -29,6 +31,13 @@ export default function App() {
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
 
             <Route path="/video-list" element={<VideoListPage />} />
+
+            <Route path="/livebroadcasts" element={<LiveBroadcastsPage />} />
+
+            <Route path="/i18n-languages" element={<I18nLanguagesAndRegionsPage />} />
+
+
+
 
             {/* <Route path="/add-book" element={<AddBook />} />
             <Route path="/add-audio-book" element={<AddAudioBook />} />

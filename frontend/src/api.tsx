@@ -1,4 +1,4 @@
-import { YouTubeApiResponse } from "./youtubeApi";
+import { YouTubeApiResponse, LiveBroadcast, LiveBroadcastInsert, LiveBroadcastUpdate } from "./youtubeApi";
 import axios from "axios";
 
 export const subscribeToChannel = async (channelId: string) => {
@@ -654,9 +654,10 @@ export const fetchYoutubeVideos = async (
         },
       }
     );
-    return response.data;
+    return response.data ?? null; // Return null if response data is undefined
   } catch (error) {
     handleApiError(error);
+    return null; // Return null in case of an error
   }
 };
 
@@ -1357,4 +1358,251 @@ export const fetchMonthlyStats = async (
   } catch (error) {
     throw handleApiError(error);
   }
+};
+
+export const searchYouTube = async (
+  query: string,
+  type: string = "video",
+  location?: string,
+  locationRadius?: string,
+  videoCategoryId?: string
+) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+    const params: Record<string, string> = {
+      key: API_KEY,
+      part: "snippet",
+      q: query,
+      type,
+      maxResults: "10",
+    };
+
+    if (location && locationRadius) {
+      params.location = location;
+      params.locationRadius = locationRadius;
+    }
+
+    if (videoCategoryId) {
+      params.videoCategoryId = videoCategoryId;
+    }
+
+    const response = await axios.get("https://www.googleapis.com/youtube/v3/search", { params });
+    return response.data.items;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const fetchChannelActivities = async (channelId: string, maxResults: number = 10) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/activities",
+      {
+        params: {
+          key: API_KEY,
+          channelId: channelId,
+          part: "snippet,contentDetails",
+          maxResults: maxResults,
+        },
+      }
+    );
+    return response.data.items;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const fetchChannelSections = async (channelId: string) => {
+  try {
+    const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/channelSections",
+      {
+        params: {
+          key: API_KEY,
+          channelId: channelId,
+          part: "snippet,contentDetails",
+        },
+      }
+    );
+    return response.data.items;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// Added fetchVideoCategoriesAPI function
+export const fetchVideoCategoriesAPI = async () => {
+  const response = await fetch("https://www.googleapis.com/youtube/v3/videoCategories", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch video categories");
+  }
+
+  const data = await response.json();
+  return data.items;
+};
+
+export const listLiveBroadcasts = async (): Promise<LiveBroadcast[]> => {
+  const token = localStorage.getItem("youtubeToken");
+  console.log("Token:", token); // Debugging log
+  if (!token) throw new Error("No access token found");
+
+  try {
+    const response = await axios.get(
+      "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    console.log("API Response:", response.data); // Debugging log
+    return response.data.items;
+  } catch (error) {
+    console.error("Error fetching live broadcasts:", error); // Debugging log
+    throw error;
+  }
+};
+
+export const insertLiveBroadcast = async (
+  broadcastDetails: LiveBroadcastInsert
+): Promise<LiveBroadcast> => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const response = await axios.post(
+    "https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,contentDetails,status",
+    broadcastDetails,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response.data;
+};
+
+export const updateLiveBroadcast = async (
+  broadcastId: string,
+  updateDetails: LiveBroadcastUpdate
+): Promise<LiveBroadcast> => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const response = await axios.put(
+    `https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,contentDetails,status&id=${broadcastId}`,
+    updateDetails,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response.data;
+};
+
+export const deleteLiveBroadcast = async (broadcastId: string): Promise<void> => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  await axios.delete(
+    `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+};
+
+export const bindLiveBroadcastToStream = async (
+  broadcastId: string,
+  streamId: string
+): Promise<LiveBroadcast> => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const response = await axios.post(
+    `https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id=${broadcastId}&streamId=${streamId}&part=id,snippet`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response.data;
+};
+
+export const controlLiveBroadcast = async (
+  broadcastId: string,
+  action: string
+): Promise<LiveBroadcast> => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const response = await axios.post(
+    `https://www.googleapis.com/youtube/v3/liveBroadcasts/control?id=${broadcastId}&action=${action}&part=id,snippet`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response.data;
+};
+
+export const transitionLiveBroadcast = async (
+  broadcastId: string,
+  broadcastStatus: string
+): Promise<LiveBroadcast> => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const response = await axios.post(
+    `https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${broadcastId}&broadcastStatus=${broadcastStatus}&part=id,snippet`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response.data;
+};
+
+export const fetchChannelMembers = async (channelId: string) => {
+  const token = localStorage.getItem("youtubeToken");
+  if (!token) throw new Error("No access token found");
+
+  const response = await axios.get(
+    `https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&channelId=${channelId}&mine=true`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.data.items) {
+    throw new Error("No members found or invalid request");
+  }
+
+  return response.data.items;
 };

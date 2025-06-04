@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const passport_1 = __importDefault(require("passport"));
 const passport_google_oauth20_1 = require("passport-google-oauth20");
 passport_1.default.use(new passport_google_oauth20_1.Strategy({
-    clientID: '108993774108-a0fr57u7e14pfn2k8b95as8hg5mbqjrs.apps.googleusercontent.com',
-    clientSecret: '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',
+    clientID: '78794365796-3k35oj3illi7ua0ac9de2650i75mijaf.apps.googleusercontent.com',
+    clientSecret: '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',
     callbackURL: 'http://localhost:3001/api/auth/google/redirect',
     scope: [
         'email',

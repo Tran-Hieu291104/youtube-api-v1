@@ -193,3 +193,90 @@ interface VideoListItemProps {
     thumbnailUrl: string;
   };
 }
+
+export interface YouTubeSearchResult {
+  id: {
+    videoId?: string;
+    channelId?: string;
+    playlistId?: string;
+  };
+  snippet: {
+    title: string;
+    description: string;
+    thumbnails: {
+      medium: {
+        url: string;
+      };
+    };
+  };
+}
+
+export interface LiveBroadcast {
+  id: string;
+  snippet: {
+    title: string;
+    description: string;
+    scheduledStartTime: string;
+    scheduledEndTime?: string;
+    liveChatId?: string;
+  };
+  status: {
+    lifeCycleStatus: string;
+    privacyStatus: string;
+  };
+  contentDetails?: {
+    monitorStream?: {
+      enableMonitorStream: boolean;
+      broadcastStreamDelayMs?: number;
+    };
+    enableEmbed?: boolean;
+    enableDvr?: boolean;
+    recordFromStart?: boolean;
+    startWithSlate?: boolean;
+  };
+}
+
+export interface LiveBroadcastInsert {
+  snippet: {
+    title: string;
+    description: string;
+    scheduledStartTime: string;
+    scheduledEndTime?: string;
+  };
+  status: {
+    privacyStatus: string;
+  };
+  contentDetails?: {
+    monitorStream?: {
+      enableMonitorStream: boolean;
+      broadcastStreamDelayMs?: number;
+    };
+    enableEmbed?: boolean;
+    enableDvr?: boolean;
+    recordFromStart?: boolean;
+    startWithSlate?: boolean;
+  };
+}
+
+export interface LiveBroadcastUpdate {
+  id: string;
+  snippet?: {
+    title?: string;
+    description?: string;
+    scheduledStartTime?: string;
+    scheduledEndTime?: string;
+  };
+  status?: {
+    privacyStatus?: string;
+  };
+  contentDetails?: {
+    monitorStream?: {
+      enableMonitorStream?: boolean;
+      broadcastStreamDelayMs?: number;
+    };
+    enableEmbed?: boolean;
+    enableDvr?: boolean;
+    recordFromStart?: boolean;
+    startWithSlate?: boolean;
+  };
+}
