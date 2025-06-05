@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+      "target": "ESNext",
+      "module": "CommonJS", // Chuyển sang CommonJS để tương thích với require()
+      "outDir": "./dist",  // Thư mục đầu ra cho file .js
+      "rootDir": "./src",  // Thư mục nguồn
+      "strict": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true
+    },
+    "include": ["src/**/*"]
+  }
